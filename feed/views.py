@@ -50,4 +50,30 @@ class FeedDetailView(View):
             }
             return JsonResponse({'data': data}, status = 200)
         except Feed.DoesNotExist:
-            return JsonResponse({'message' : "DOES_NOT_EXIST_FEED"}, status = 400)
+            return JsonResponse({'message' : 'DOES_NOT_EXIST_FEED'}, status = 400)
+
+
+class LikeView(View):
+    @login_decorator
+    def put(self, request, feed_id):
+        user = request.user
+        FeedLike(
+            feed_id = feed_id,
+            user_id = user
+        ).save()
+        # feed.count_like +1
+        feed = Feed.objects.get(id = feed_id).count_like
+        feed += 1
+        result = True
+        return JsonResponse({'message': result}, status = 200)
+    
+    @login_decorator
+    def delete(self, request, feed_id):
+        user = request.user
+        like = FeedLike.objects.get(feed_id = feed_id, user_id = user)
+        like.delete()
+        # feed.count_like -1
+        feed = Feed.objects.get(id = feed_id).count_like
+        feed -= 1
+        result = False
+        return JsonResponse({'message': result}, status = 200)
