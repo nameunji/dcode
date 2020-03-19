@@ -89,6 +89,10 @@ class LikeView(View):
 
 class SharedView(View):
     def put(self, request, feed_id):
-        feed_count_shared = Feed.objects.get(id = feed_id).count_shared
-        feed_count_shared += 1
-        return HttpResponse(status = 200)
+        try:
+            feed = Feed.objects.get(id = feed_id)
+            feed.count_shared += 1
+            feed.save()
+            return HttpResponse(status = 200)
+        except Feed.DoesNotExist:
+            return JsonResponse({'message': 'DOES_NOT_FEED'}, status = 400)
