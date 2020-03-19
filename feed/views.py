@@ -1,3 +1,6 @@
+import json
+
+from utils   import login_decorator 
 from .models import (
     Tag,
     Feed,
@@ -6,7 +9,6 @@ from .models import (
     FeedLike,
     FeedComment
 )
-from utils       import login_decorator 
 
 from django.views import View
 from django.http  import JsonResponse, HttpResponse
@@ -96,3 +98,83 @@ class SharedView(View):
             return HttpResponse(status = 200)
         except Feed.DoesNotExist:
             return JsonResponse({'message': 'DOES_NOT_FEED'}, status = 400)
+
+
+class Comment(object):
+    def __init__(self, data, parent, user):
+        self.id         = data.id
+        self.user_id    = data.user_id
+        self.user_name  = User.objects.get(id = data.user_id).nickname
+        self.comment    = data.comment
+        self.created_at = data.created_at.strftime("%Y-%m-%d %H:%M")
+        self.updated_at = data.updated_at.strftime("%Y-%m-%d %H:%M")
+        self.editable   = data.user_id == user
+        if parent:
+            child_comments = FeedComment.objects.filter(parent = data.id)
+            self.reply = [Comment(comment, False, user).__dict__ for comment in child_comments]
+
+class CommentView(View):
+    # 조회
+    @login_decorator
+    def get(self, request, feed_id):
+        if hasattr(request, 'user') : user = request.user.id
+        else : user = 0
+        
+        parent_comments = FeedComment.objects.filter(feed_id = feed_id, parent__isnull = True)
+        comments = [Comment(comment, True, user).__dict__ for comment in parent_comments]
+                
+        return JsonResponse({'data': comments}, status = 200)
+
+    # 삽입
+    @login_decorator
+    def post(self, request, feed_id):
+        user = request.user
+        data = json.loads(request.body)
+        if 'parent' in data:
+            FeedComment(
+                feed_id = feed_id,
+                user_id = user.id,
+                comment = data["comment"],
+                parent  = data["parent"]
+            ).save()
+        else:
+            FeedComment(
+                feed_id = feed_id,
+                user_id = user.id,
+                comment = data["comment"],
+            ).save()
+        
+        feed = Feed.objects.get(id = feed_id)
+        feed.count_comment += 1
+        feed.save()
+
+        return HttpResponse(status = 200)
+
+    # 수정
+    @login_decorator
+    def put(self, request, feed_id):
+        user = request.user
+        data = json.loads(request.body)
+        comment_id = int(request.GET.get('comment_id', 0))
+
+        # feed.count_comment +1
+        comment = FeedComment.objects.get(id = comment_id)
+        comment.comment = data["comment"]
+        comment.save()
+        
+        return HttpResponse(status = 200)
+
+    # 삭제
+    @login_decorator
+    def delete(self, request, feed_id):
+        user = request.user
+        comment_id = int(request.GET.get('comment_id', 0))
+        comment = FeedComment.objects.get(id = comment_id)
+        comment.delete()
+
+        # feed.count_comment -1
+        feed = Feed.objects.get(id = feed_id)
+        feed.count_comment -= 1
+        feed.save()
+
+        return HttpResponse(status = 200)
