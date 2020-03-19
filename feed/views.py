@@ -37,6 +37,7 @@ class FeedListView(View):
         return JsonResponse({'list': data, 'totalCount':total_count}, status = 200)
 
 class FeedDetailView(View):
+    @login_decorator
     def get(self, request, feed_id):
         try:
             feed = Feed.objects.prefetch_related('feedthumbnail_set').get(id = feed_id)
@@ -49,8 +50,14 @@ class FeedDetailView(View):
                 'updated_at'    : feed.updated_at.strftime("%Y-%m-%d %H:%M"),
                 'count_like'    : feed.count_like,
                 'count_comment' : feed.count_comment,
-                'count_shared'  : feed.count_shared
+                'count_shared'  : feed.count_shared,
+                'user_like'     : False
             }
+            if hasattr(request, 'user'):
+                user = request.user.id
+                feedlike = FeedLike.objects.filter(feed_id = feed_id, user_id = user)
+                if feedlike.exists():
+                    data['user_like'] = True
             return JsonResponse({'data': data}, status = 200)
         except Feed.DoesNotExist:
             return JsonResponse({'message' : 'DOES_NOT_EXIST_FEED'}, status = 400)
