@@ -17,6 +17,7 @@ class FeedListView(View):
     def get(self, request):
         pageNo   = int(request.GET.get('pageNo', 0)) 
         pageSize = int(request.GET.get('pageSize', 10))
+        if pageSize > 10: pageSize = 10
 
         feeds = Feed.objects.order_by('-created_at')[pageNo * pageSize : (pageNo+1) * pageSize]
 
